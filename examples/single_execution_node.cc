@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     }
 
     std::filesystem::path model_path = 
-        runfiles->Rlocation("mujoco-models+/models/walter_sr/scene_walter_sr_v2.xml");
+        runfiles->Rlocation("mujoco-models~/models/walter_sr/scene_walter_sr_v2.xml");
 
     // 3. Instantiate Executor and set global pointer
     rclcpp::executors::MultiThreadedExecutor executor;
