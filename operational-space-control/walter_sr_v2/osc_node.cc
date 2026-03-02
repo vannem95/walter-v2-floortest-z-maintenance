@@ -1,4 +1,4 @@
-#include "operational-space-control/walter_sr/osc_node.h"
+#include "operational-space-control/walter_sr_v2/osc_node.h"
 
 // Your anonymous namespace with Casadi functions goes here.
 namespace {
@@ -51,6 +51,37 @@ namespace {
         }
         return C;
     }
+
+    double get_propeller_leg_height(
+            const Eigen::Quaterniond& body_quat, 
+            double q_hip, double q_knee, 
+            double q_hip_offset, double q_knee_offset,
+            double L_thigh, double L_shin, double R_wheel) 
+        {
+            double theta_hip_calibrated  = q_hip + q_hip_offset;
+            double theta_knee_calibrated = q_knee + q_knee_offset;
+
+            Eigen::Vector3d v_thigh(0, 0, -L_thigh);
+            double y_offset = -0.04675; 
+            
+            Eigen::Vector3d v_wheel_A( L_shin, y_offset, 0); 
+            Eigen::Vector3d v_wheel_B(-L_shin, y_offset, 0);
+
+            double global_shin = theta_hip_calibrated + theta_knee_calibrated;
+
+            Eigen::AngleAxisd rot_thigh(theta_hip_calibrated, Eigen::Vector3d::UnitY());
+            Eigen::AngleAxisd rot_shin(global_shin,           Eigen::Vector3d::UnitY());
+
+            Eigen::Vector3d p_knee = rot_thigh * v_thigh;
+            Eigen::Vector3d p_wheel_A = p_knee + (rot_shin * v_wheel_A);
+            Eigen::Vector3d p_wheel_B = p_knee + (rot_shin * v_wheel_B);
+
+            Eigen::Vector3d g_A = body_quat * p_wheel_A;
+            Eigen::Vector3d g_B = body_quat * p_wheel_B;
+
+            return std::max(-g_A.z(), -g_B.z()) + R_wheel;
+        }    
+
 }
 
 // Full constructor implementation
@@ -307,6 +338,30 @@ void OSCNode::timer_callback() {
         last_time_ = current_time;
         return; 
     }
+
+
+
+    // --- PROPELLER HEIGHT CALCULATION ---
+    Eigen::Quaterniond q_body(local_state.body_rotation(0), local_state.body_rotation(1), 
+                               local_state.body_rotation(2), local_state.body_rotation(3));
+    
+    // Physical Parameters (Adjust these if your XML differs)
+    const double L_THIGH = 0.22; 
+    const double L_SHIN = 0.22;
+    const double R_WHEEL = 0.04;
+
+    // Calculate for each leg
+    double h_rl = get_propeller_leg_height(q_body, local_state.motor_position(0), local_state.motor_position(1), 0, 0, L_THIGH, L_SHIN, R_WHEEL);
+    double h_rr = get_propeller_leg_height(q_body, local_state.motor_position(2), local_state.motor_position(3), 0, 0, L_THIGH, L_SHIN, R_WHEEL);
+    double h_fl = get_propeller_leg_height(q_body, local_state.motor_position(4), local_state.motor_position(5), 0, 0, L_THIGH, L_SHIN, R_WHEEL);
+    double h_fr = get_propeller_leg_height(q_body, local_state.motor_position(6), local_state.motor_position(7), 0, 0, L_THIGH, L_SHIN, R_WHEEL);
+
+    // --- PRINTING HEIGHTS ---
+    if (!local_safety_override_active) {
+        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 100, 
+            "\n[Propeller Heights (m)]\nFL: %.3f | FR: %.3f\nRL: %.3f | RR: %.3f", 
+            h_fl, h_fr, h_rl, h_rr);
+    }    
 
     
 
@@ -622,6 +677,17 @@ void OSCNode::update_osc_data() {
     Matrix<model::nv_size, model::nv_size> mass_matrix = Matrix<model::nv_size, model::nv_size>::Zero();
     mj_fullM(mj_model_, mass_matrix.data(), mj_data_->qM);
     Vector<model::nv_size> coriolis_matrix = Eigen::Map<Vector<model::nv_size>>(mj_data_->qfrc_bias);
+
+    // ===============================
+    // --- NEW: Add Passive Force Compensation ---
+    // Mapping qfrc_passive (Damping/Springs)
+    Vector<model::nv_size> passive_forces = Eigen::Map<Vector<model::nv_size>>(mj_data_->qfrc_passive);
+    
+    // Total non-actuated forces = Bias - Passive
+    // This ensures the solver accounts for the 'help' or 'resistance' from joint damping
+    coriolis_matrix -= passive_forces;
+    // ===============================
+
     Vector<model::nq_size> generalized_positions = Eigen::Map<Vector<model::nq_size>>(mj_data_->qpos);
     Vector<model::nv_size> generalized_velocities = Eigen::Map<Vector<model::nv_size>>(mj_data_->qvel);
 

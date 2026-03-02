@@ -2,7 +2,7 @@
     Operational Space Controller Module
 """
 module(
-    name = "osc-ground-test",
+    name = "walter-v2-floortest-z-maintenance",
 )
 
 

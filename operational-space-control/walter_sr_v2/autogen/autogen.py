@@ -22,7 +22,7 @@ class AutoGen():
 
         # Parse Configuration YAML File:
         r = Runfiles.Create()
-        with open(r.Rlocation("osc-ground-test/config/walter_sr/walter_sr_config.yaml"), "r") as file:
+        with open(r.Rlocation("walter-v2-floortest-z-maintenance/config/walter_sr_v2/walter_sr_config.yaml"), "r") as file:
             config = yaml.safe_load(file)
 
         # Get Weight Configuration:
@@ -523,7 +523,7 @@ def main(argv):
     r = Runfiles.Create()
     mj_model = mujoco.MjModel.from_xml_path(
         r.Rlocation(
-            path="mujoco-models/models/walter_sr/WaLTER_Senior_updated.xml",
+            path="mujoco-models/models/walter_sr/WaLTER_Senior_v2.xml",
         )
     )
 
