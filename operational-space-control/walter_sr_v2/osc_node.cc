@@ -345,10 +345,10 @@ void OSCNode::timer_callback() {
     Eigen::Quaterniond q_body(local_state.body_rotation(0), local_state.body_rotation(1), 
                                local_state.body_rotation(2), local_state.body_rotation(3));
     
-    // Physical Parameters (Adjust these if your XML differs)
-    const double L_THIGH = 0.22; 
-    const double L_SHIN = 0.22;
-    const double R_WHEEL = 0.04;
+    // link lengths
+    const double L_THIGH = 0.1016;  // hip to knee
+    const double L_SHIN  = 0.08255; // knee to wheel center
+    const double R_WHEEL = 0.0635;  // Radius of the wheel
 
     // Calculate for each leg
     double h_rl = get_propeller_leg_height(q_body, local_state.motor_position(0), local_state.motor_position(1), 0, 0, L_THIGH, L_SHIN, R_WHEEL);
