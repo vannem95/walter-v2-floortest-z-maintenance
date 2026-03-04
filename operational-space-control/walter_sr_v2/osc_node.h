@@ -24,6 +24,8 @@
 #include "osc_2_in_interface/msg/osc_torque_command.hpp"
 #include "osc_2_in_interface/msg/osc_taskspace_targets.hpp"
 
+#include "std_msgs/msg/float64_multi_array.hpp"
+
 // #include "osc_2_in_interface/msg/command.hpp"
 // #include "osc_2_in_interface/msg/motor_command.hpp"
 // #include "osc_2_in_interface/msg/wheel_motor_command.hpp"
@@ -117,6 +119,11 @@ private:
     // rclcpp::Subscription<OSCTaskspaceTargets>::SharedPtr taskspace_targets_subscriber_;
     // rclcpp::Publisher<OSCTorqueCommand>::SharedPtr torque_publisher_;
     rclcpp::Publisher<Command>::SharedPtr torque_publisher_;
+
+    // Inside OSCNode class private members:
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr data_pub_;    
+    std_msgs::msg::Float64MultiArray data_msg_; // Persistent message
+
     rclcpp::TimerBase::SharedPtr timer_;
 
     // Mutexes for thread-safe access

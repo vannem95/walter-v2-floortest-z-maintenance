@@ -253,12 +253,36 @@ OSCNode::OSCNode(const std::string& xml_path)
     torque_publisher_ = this->create_publisher<Command>("walter/command", 1);
     // torque_publisher_ = this->create_publisher<OSCTorqueCommand>("walter/command", 10);
     // New: 5000 microseconds (5 ms = 200 Hz)
+    
+    //===========================================================================
+    auto data_qos = rclcpp::QoS(rclcpp::KeepLast(10));
+    data_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
+    data_qos.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
+
+    data_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
+        "walter/data", data_qos);
+
+    // Initialize the telemetry message layout ONCE
+    // int num_sites = model::site_ids_size;
+    // int num_dof = 6; 
+    
+    data_msg_.layout.dim.resize(4);
+    
+    // Add your metadata note here!
+    data_msg_.layout.dim[0].label = "h_fl, h_fr, h_rl, h_rr"; 
+    
+    // Reserve memory so push_back is zero-overhead
+    // data_msg_.data.reserve(num_sites * num_dof);        
+    data_msg_.data.reserve(1);        
+    //===========================================================================
+
     timer_ = this->create_wall_timer(std::chrono::microseconds(5000), std::bind(&OSCNode::timer_callback, this));
 
     rclcpp::on_shutdown([this]() {
         RCLCPP_WARN(this->get_logger(), "Shutdown signal received. Attempting to stop robot...");
         this->stop_robot();
-    });    
+    });
+
 }
 
 OSCNode::~OSCNode() {
@@ -447,6 +471,31 @@ void OSCNode::timer_callback() {
         taskspace_targets_.row(3)(4) = hl_ddq_cmd; taskspace_targets_.row(4)(4) = hr_ddq_cmd;
         taskspace_targets_.row(5)(4) = tlh_ddq_cmd; taskspace_targets_.row(6)(4) = trh_ddq_cmd;
         taskspace_targets_.row(7)(4) = hlh_ddq_cmd; taskspace_targets_.row(8)(4) = hrh_ddq_cmd;
+
+
+
+        // ==============================================================================
+        // --- NEW: PUBLISH N x 6 MATRIX FOR ROSBAG RECORDING ---
+        // ==============================================================================
+        // 1. Clear the numbers from the LAST loop (does not clear the layout/label)
+        data_msg_.data.clear();
+        
+        // 2. Dump the new numbers
+        // for (int i = 0; i < model::site_ids_size; ++i) {
+        //     for (int j = 0; j < 6; ++j) {
+        //         data_msg_.data.push_back(taskspace_targets_(i, j));
+        //     }
+        // }
+        
+        data_msg_.data.push_back(h_fl);
+        data_msg_.data.push_back(h_fr);
+        data_msg_.data.push_back(h_rl);
+        data_msg_.data.push_back(h_rr);
+
+        // 3. Publish
+        data_pub_->publish(data_msg_);
+        // ==============================================================================
+
 
         
         // Solve Optimization
